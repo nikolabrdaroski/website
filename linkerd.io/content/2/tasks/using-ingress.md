@@ -8,39 +8,35 @@ there is some configuration required. Linkerd discovers services based on the
 `:authority` or `Host` header. This allows Linkerd to understand what service a
 request is destined for without being dependent on DNS or IPs.
 
-When it comes to ingress, most controllers do not rewrite the
-incoming header (`example.com`) to the internal service name
+When it comes to ingress, most controllers do not rewrite the incoming header
+(`example.com`) to the internal service name
 (`example.default.svc.cluster.local`) by default. In this case, when Linkerd
 receives the outgoing request it thinks the request is destined for
 `example.com` and not `example.default.svc.cluster.local`. This creates an
 infinite loop that can be pretty frustrating!
 
 Luckily, many ingress controllers allow you to either modify the `Host` header
-or add a custom header to the outgoing request. Here are some instructions
-for common ingress controllers:
+or add a custom header to the outgoing request. Here are some instructions for
+common ingress controllers:
 
 {{< pagetoc >}}
 
-{{< note >}}
-If your ingress controller is terminating HTTPS, Linkerd will only provide
-TCP stats for the incoming requests because all the proxy sees is encrypted
-traffic. It will provide complete stats for the outgoing requests from your
-controller to the backend services as this is in plain text from the
-controller to Linkerd.
+{{< note >}} If your ingress controller is terminating HTTPS, Linkerd will only
+provide TCP stats for the incoming requests because all the proxy sees is
+encrypted traffic. It will provide complete stats for the outgoing requests from
+your controller to the backend services as this is in plain text from the
+controller to Linkerd. {{< /note >}}
+
+{{< note >}} If requests experience a 2-3 second delay after injecting your
+ingress controller, it is likely that this is because the service of
+`type: LoadBalancer` is obscuring the client source IP. You can fix this by
+setting `externalTrafficPolicy: Local` in the ingress' service definition.
 {{< /note >}}
 
-{{< note >}}
-If requests experience a 2-3 second delay after injecting your ingress
-controller, it is likely that this is because the service of `type:
-LoadBalancer` is obscuring the client source IP. You can fix this by setting
-`externalTrafficPolicy: Local` in the ingress' service definition.
-{{< /note >}}
-
-{{< note >}}
-While the Kubernetes Ingress API definition allows a `backend`'s `servicePort`
-to be a string value, only numeric `servicePort` values can be used with Linkerd.
-If a string value is encountered, Linkerd will default to using port 80.
-{{< /note >}}
+{{< note >}} While the Kubernetes Ingress API definition allows a `backend`'s
+`servicePort` to be a string value, only numeric `servicePort` values can be
+used with Linkerd. If a string value is encountered, Linkerd will default to
+using port 80. {{< /note >}}
 
 ## Nginx
 
@@ -56,49 +52,49 @@ metadata:
   name: web-ingress
   namespace: emojivoto
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.class: 'nginx'
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
       grpc_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
 
 spec:
   rules:
-  - host: example.com
-    http:
-      paths:
-      - backend:
-          serviceName: web-svc
-          servicePort: 80
+    - host: example.com
+      http:
+        paths:
+          - backend:
+              serviceName: web-svc
+              servicePort: 80
 ```
 
 The important annotation here is:
 
 ```yaml
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      proxy_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
-      grpc_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
+nginx.ingress.kubernetes.io/configuration-snippet: |
+  proxy_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
+  grpc_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
 ```
 
-{{< note >}}
-If you are using [auth-url](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/#external-authentication)
+{{< note >}} If you are using
+[auth-url](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/#external-authentication)
 you'd need to add the following snippet as well.
 
 ```yaml
-    nginx.ingress.kubernetes.io/auth-snippet: |
-      proxy_set_header l5d-dst-override authn-name.authn-namespace.svc.cluster.local:authn-port;
-      grpc_set_header l5d-dst-override authn-name.authn-namespace.svc.cluster.local:authn-port;
+nginx.ingress.kubernetes.io/auth-snippet: |
+  proxy_set_header l5d-dst-override authn-name.authn-namespace.svc.cluster.local:authn-port;
+  grpc_set_header l5d-dst-override authn-name.authn-namespace.svc.cluster.local:authn-port;
 ```
 
 {{< /note >}}
 
-This example combines the two directives that NGINX uses for proxying HTTP
-and gRPC traffic. In practice, it is only necessary to set either the
+This example combines the two directives that NGINX uses for proxying HTTP and
+gRPC traffic. In practice, it is only necessary to set either the
 `proxy_set_header` or `grpc_set_header` directive, depending on the protocol
 used by the service, however NGINX will ignore any directives that it doesn't
 need.
 
-This sample ingress definition uses a single ingress for an application
-with multiple endpoints using different ports.
+This sample ingress definition uses a single ingress for an application with
+multiple endpoints using different ports.
 
 ```yaml
 apiVersion: extensions/v1beta1
@@ -107,29 +103,28 @@ metadata:
   name: web-ingress
   namespace: emojivoto
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.class: 'nginx'
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
       grpc_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
 spec:
   rules:
-  - host: example.com
-    http:
-      paths:
-      - path: /
-        backend:
-          serviceName: web-svc
-          servicePort: 80
-      - path: /another-endpoint
-        backend:
-          serviceName: another-svc
-          servicePort: 8080
+    - host: example.com
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: web-svc
+              servicePort: 80
+          - path: /another-endpoint
+            backend:
+              serviceName: another-svc
+              servicePort: 8080
 ```
 
-Nginx will add a `l5d-dst-override` header to instruct Linkerd what service
-the request is destined for. You'll want to include both the Kubernetes service
-FQDN (`web-svc.emojivoto.svc.cluster.local`) *and* the destination
-`servicePort`.
+Nginx will add a `l5d-dst-override` header to instruct Linkerd what service the
+request is destined for. You'll want to include both the Kubernetes service FQDN
+(`web-svc.emojivoto.svc.cluster.local`) _and_ the destination `servicePort`.
 
 To test this, you'll want to get the external IP address for your controller. If
 you installed nginx-ingress via helm, you can get that IP address by running:
@@ -146,9 +141,8 @@ You can then use this IP with curl:
 curl -H "Host: example.com" http://external-ip
 ```
 
-{{< note >}}
-If you are using a default backend, you will need to create an ingress
-definition for that backend to ensure that the `l5d-dst-override` header
+{{< note >}} If you are using a default backend, you will need to create an
+ingress definition for that backend to ensure that the `l5d-dst-override` header
 is set. For example:
 
 ```yaml
@@ -158,7 +152,7 @@ metadata:
   name: default-ingress
   namespace: backends
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.class: 'nginx'
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
       grpc_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
@@ -186,16 +180,16 @@ metadata:
   name: web-ingress
   namespace: emojivoto
   annotations:
-    kubernetes.io/ingress.class: "traefik"
+    kubernetes.io/ingress.class: 'traefik'
     ingress.kubernetes.io/custom-request-headers: l5d-dst-override:web-svc.emojivoto.svc.cluster.local:80
 spec:
   rules:
-  - host: example.com
-    http:
-      paths:
-      - backend:
-          serviceName: web-svc
-          servicePort: 80
+    - host: example.com
+      http:
+        paths:
+          - backend:
+              serviceName: web-svc
+              servicePort: 80
 ```
 
 The important annotation here is:
@@ -206,7 +200,7 @@ ingress.kubernetes.io/custom-request-headers: l5d-dst-override:web-svc.emojivoto
 
 Traefik will add a `l5d-dst-override` header to instruct Linkerd what service
 the request is destined for. You'll want to include both the Kubernetes service
-FQDN (`web-svc.emojivoto.svc.cluster.local`) *and* the destination
+FQDN (`web-svc.emojivoto.svc.cluster.local`) _and_ the destination
 `servicePort`. Please see the Traefik website for more information.
 
 To test this, you'll want to get the external IP address for your controller. If
@@ -224,26 +218,24 @@ You can then use this IP with curl:
 curl -H "Host: example.com" http://external-ip
 ```
 
-{{< note >}}
-This solution won't work if you're using Traefik's service weights as
-Linkerd will always send requests to the service name in `l5d-dst-override`. A
-workaround is to use `traefik.frontend.passHostHeader: "false"` instead. Be
+{{< note >}} This solution won't work if you're using Traefik's service weights
+as Linkerd will always send requests to the service name in `l5d-dst-override`.
+A workaround is to use `traefik.frontend.passHostHeader: "false"` instead. Be
 aware that if you're using TLS, the connection between Traefik and the backend
 service will not be encrypted. There is an
 [open issue](https://github.com/linkerd/linkerd2/issues/2270) to track the
-solution to this problem.
-{{< /note >}}
+solution to this problem. {{< /note >}}
 
 ### Traefik 2.x
 
 Traefik 2.x adds support for path based request routing with a Custom Resource
 Definition (CRD) called `IngressRoute`.
 
-If you choose to use [`IngressRoute`](https://docs.traefik.io/providers/kubernetes-crd/)
-instead of the default Kubernetes `Ingress`
-resource, then you'll also need to use the Traefik's
-[`Middleware`](https://docs.traefik.io/middlewares/headers/) Custom Resource
-Definition to add the `l5d-dst-override` header.
+If you choose to use
+[`IngressRoute`](https://docs.traefik.io/providers/kubernetes-crd/) instead of
+the default Kubernetes `Ingress` resource, then you'll also need to use the
+Traefik's [`Middleware`](https://docs.traefik.io/middlewares/headers/) Custom
+Resource Definition to add the `l5d-dst-override` header.
 
 The YAML below uses the Traefik CRDs to produce the same results for the
 `emojivoto` application, as described above.
@@ -257,7 +249,7 @@ metadata:
 spec:
   headers:
     customRequestHeaders:
-      l5d-dst-override: "web-svc.emojivoto.svc.cluster.local:80"
+      l5d-dst-override: 'web-svc.emojivoto.svc.cluster.local:80'
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
@@ -270,15 +262,15 @@ metadata:
 spec:
   entryPoints: []
   routes:
-  - kind: Rule
-    match: PathPrefix(`/`)
-    priority: 0
-    middlewares:
-    - name: l5d-header-middleware
-    services:
-    - kind: Service
-      name: web-svc
-      port: 80
+    - kind: Rule
+      match: PathPrefix(`/`)
+      priority: 0
+      middlewares:
+        - name: l5d-header-middleware
+      services:
+        - kind: Service
+          name: web-svc
+          port: 80
 ```
 
 ## GCE
@@ -288,8 +280,10 @@ Take a look at [getting started](/2/getting-started/) for a refresher on how to
 install it.
 
 In addition to the custom headers found in the Traefik example, it shows how to
-use a [Google Cloud Static External IP Address](https://cloud.google.com/compute/docs/ip-addresses/reserve-static-external-ip-address)
-and TLS with a [Google-managed certificate](https://cloud.google.com/load-balancing/docs/ssl-certificates#managed-certs).
+use a
+[Google Cloud Static External IP Address](https://cloud.google.com/compute/docs/ip-addresses/reserve-static-external-ip-address)
+and TLS with a
+[Google-managed certificate](https://cloud.google.com/load-balancing/docs/ssl-certificates#managed-certs).
 
 The sample ingress definition is:
 
@@ -300,18 +294,19 @@ metadata:
   name: web-ingress
   namespace: emojivoto
   annotations:
-    kubernetes.io/ingress.class: "gce"
-    ingress.kubernetes.io/custom-request-headers: "l5d-dst-override: web-svc.emojivoto.svc.cluster.local:80"
-    ingress.gcp.kubernetes.io/pre-shared-cert: "managed-cert-name"
-    kubernetes.io/ingress.global-static-ip-name: "static-ip-name"
+    kubernetes.io/ingress.class: 'gce'
+    ingress.kubernetes.io/custom-request-headers:
+      'l5d-dst-override: web-svc.emojivoto.svc.cluster.local:80'
+    ingress.gcp.kubernetes.io/pre-shared-cert: 'managed-cert-name'
+    kubernetes.io/ingress.global-static-ip-name: 'static-ip-name'
 spec:
   rules:
-  - host: example.com
-    http:
-      paths:
-      - backend:
-          serviceName: web-svc
-          servicePort: 80
+    - host: example.com
+      http:
+        paths:
+          - backend:
+              serviceName: web-svc
+              servicePort: 80
 ```
 
 To use this example definition, substitute `managed-cert-name` and
@@ -350,25 +345,23 @@ spec:
   selector:
     app: web-svc
   ports:
-  - name: http
-    port: 80
-    targetPort: http
+    - name: http
+      port: 80
+      targetPort: http
 ```
 
 The important annotation here is:
 
 ```yaml
-      add_linkerd_headers: true
+add_linkerd_headers: true
 ```
 
 Ambassador will add a `l5d-dst-override` header to instruct Linkerd what service
-the request is destined for. This will contain both the Kubernetes service
-FQDN (`web-svc.emojivoto.svc.cluster.local`) *and* the destination
-`servicePort`.
+the request is destined for. This will contain both the Kubernetes service FQDN
+(`web-svc.emojivoto.svc.cluster.local`) _and_ the destination `servicePort`.
 
-{{< note >}}
-To make this global, add `add_linkerd_headers` to your `Module` configuration.
-{{< /note >}}
+{{< note >}} To make this global, add `add_linkerd_headers` to your `Module`
+configuration. {{< /note >}}
 
 To test this, you'll want to get the external IP address for your controller. If
 you installed Ambassador via helm, you can get that IP address by running:
@@ -379,10 +372,9 @@ kubectl get svc --all-namespaces \
   -o='custom-columns=EXTERNAL-IP:.status.loadBalancer.ingress[0].ip'
 ```
 
-{{< note >}}
-If you've installed the admin interface, this will return two IPs, one of which
-will be `<none>`. Just ignore that one and use the actual IP address.
-{{</ note >}}
+{{< note >}} If you've installed the admin interface, this will return two IPs,
+one of which will be `<none>`. Just ignore that one and use the actual IP
+address. {{</ note >}}
 
 You can then use this IP with curl:
 
@@ -392,8 +384,8 @@ curl -H "Host: example.com" http://external-ip
 
 ## Gloo
 
-This uses `books` as an example, take a look at
-[Demo: Books](/2/tasks/books/) for instructions on how to run it.
+This uses `books` as an example, take a look at [Demo: Books](/2/tasks/books/)
+for instructions on how to run it.
 
 If you installed Gloo using the Gateway method (`gloo install gateway`), then
 you'll need a VirtualService to be able to route traffic to your **Books**
@@ -437,38 +429,37 @@ metadata:
 spec:
   virtualHost:
     domains:
-    - '*'
+      - '*'
     name: gloo-system.books
     routes:
-    - matcher:
-        prefix: /
-      routeAction:
-        single:
-          upstream:
-            name: booksapp-webapp-7000
-            namespace: gloo-system
-      routePlugins:
-        transformations:
-          requestTransformation:
-            transformationTemplate:
-              headers:
-                l5d-dst-override:
-                  text: webapp.booksapp.svc.cluster.local:7000
-                passthrough: {}
-
+      - matcher:
+          prefix: /
+        routeAction:
+          single:
+            upstream:
+              name: booksapp-webapp-7000
+              namespace: gloo-system
+        routePlugins:
+          transformations:
+            requestTransformation:
+              transformationTemplate:
+                headers:
+                  l5d-dst-override:
+                    text: webapp.booksapp.svc.cluster.local:7000
+                  passthrough: {}
 ```
 
 The important annotation here is:
 
 ```yaml
-      routePlugins:
-        transformations:
-          requestTransformation:
-            transformationTemplate:
-              headers:
-                l5d-dst-override:
-                  text: webapp.booksapp.svc.cluster.local:7000
-                passthrough: {}
+routePlugins:
+  transformations:
+    requestTransformation:
+      transformationTemplate:
+        headers:
+          l5d-dst-override:
+            text: webapp.booksapp.svc.cluster.local:7000
+          passthrough: {}
 ```
 
 Using the content transformation engine built-in in Gloo, you can instruct it to
@@ -491,15 +482,15 @@ http://192.168.99.132:30969
 ```
 
 For the example VirtualService above, which listens to any domain and path,
-accessing the proxy URL (`http://192.168.99.132:30969`) in your browser
-should open the Books application.
+accessing the proxy URL (`http://192.168.99.132:30969`) in your browser should
+open the Books application.
 
 ## Contour
 
-Contour doesn't support setting the `l5d-dst-override` header automatically.
-The following example uses the
-[Contour getting started](https://projectcontour.io/getting-started/) documentation
-to demonstrate how to set the required header manually:
+Contour doesn't support setting the `l5d-dst-override` header automatically. The
+following example uses the
+[Contour getting started](https://projectcontour.io/getting-started/)
+documentation to demonstrate how to set the required header manually:
 
 First, inject Linkerd into your Contour installation:
 
@@ -507,9 +498,9 @@ First, inject Linkerd into your Contour installation:
 linkerd inject https://projectcontour.io/quickstart/contour.yaml | kubectl apply -f -
 ```
 
-Envoy will not auto mount the service account token.
-To fix this you need to set `automountServiceAccountToken: true`.
-Optionally you can create a dedicated service account to avoid using the `default`.
+Envoy will not auto mount the service account token. To fix this you need to set
+`automountServiceAccountToken: true`. Optionally you can create a dedicated
+service account to avoid using the `default`.
 
 ```bash
 # create a service account (optional)
@@ -546,14 +537,15 @@ metadata:
   namespace: default
 spec:
   routes:
-  - requestHeadersPolicy:
-      set:
-      - name: l5d-dst-override
-        value: kuard.default.svc.cluster.local:80
-    services:
-    - name: kuard
-      namespace: default
-      port: 80
+    - requestHeadersPolicy:
+        set:
+          - name: l5d-dst-override
+            value: kuard.default.svc.cluster.local:80
+      services:
+        - name: kuard
+          namespace: default
+          port: 80
+          protocol: h2c # needed for grpc
   virtualhost:
     fqdn: 127.0.0.1.xip.io
 ```
@@ -567,7 +559,6 @@ kubectl port-forward svc/envoy -n projectcontour 3200:80
 http://127.0.0.1.xip.io:3200
 ```
 
-{{< note >}}
-If you are using Contour with [flagger](https://github.com/weaveworks/flagger)
-the `l5d-dst-override` headers will be set automatically.
-{{< /note >}}
+{{< note >}} If you are using Contour with
+[flagger](https://github.com/weaveworks/flagger) the `l5d-dst-override` headers
+will be set automatically. {{< /note >}}
